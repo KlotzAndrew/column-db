@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/gocarina/gocsv"
 
@@ -25,9 +26,20 @@ func NewWriter(dataDir string) Writer {
 }
 
 func (w *Writer) Setup() error {
-	f, err := os.OpenFile(w.dataDir+"index.int", os.O_RDWR|os.O_CREATE, 0755)
+	indexPath := w.dataDir + "index.int"
+	f, err := os.OpenFile(indexPath, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return err
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if fi.Size() == 0 {
+		if _, err := f.WriteString("index,timestamp\n"); err != nil {
+			return err
+		}
 	}
 
 	w.fileHandles = map[string]*os.File{
@@ -43,17 +55,21 @@ func (w *Writer) SaveEvent(e models.Event) error {
 		return err
 	}
 
-	fmt.Println(index)
+	rowString := fmt.Sprintf("%d,%d\n", index, time.Now().Unix())
+
+	indexFile := w.fileHandles["index.int"]
+
+	if _, err := indexFile.WriteString(rowString); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 type Row struct {
-	Index     int
-	Timestamp int
+	Index     int `csv:"index"`
+	Timestamp int `csv:"timestamp"`
 }
-
-// read a file line by line and convert it to a Row struct
 
 func (w *Writer) getNextIndex() (int, error) {
 	w.m.Lock()
