@@ -18,7 +18,11 @@ func TestWriteAndRead(t *testing.T) {
 		},
 	}
 
-	err := writer.SaveEvent(event)
+	w := writer.NewWriter("data/")
+	err := w.Setup()
+	assert.NoError(t, err)
+
+	err = w.SaveEvent(event)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, 1)
 
