@@ -4,24 +4,27 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
-
-	"github.com/gocarina/gocsv"
 
 	"columndb/models"
+
+	"github.com/gocarina/gocsv"
+	"github.com/jonboulle/clockwork"
 )
 
 type Writer struct {
-	m sync.Mutex
+	m     sync.Mutex
+	clock clockwork.Clock
 
-	dataDir string
+	dataDir      string
+	currentIndex int
 
 	fileHandles map[string]*os.File
 }
 
-func NewWriter(dataDir string) Writer {
+func NewWriter(dataDir string, clock clockwork.Clock) Writer {
 	return Writer{
 		dataDir: dataDir,
+		clock:   clock,
 	}
 }
 
@@ -32,30 +35,53 @@ func (w *Writer) Setup() error {
 		return err
 	}
 
-	fi, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	if fi.Size() == 0 {
-		if _, err := f.WriteString("index,timestamp\n"); err != nil {
+	rows := []*Row{}
+	if err := gocsv.UnmarshalFile(f, &rows); err != nil {
+		if err == gocsv.ErrEmptyCSVFile {
+			if _, err := f.WriteString("index,timestamp\n"); err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 	}
+
+	w.currentIndex = len(rows)
 
 	w.fileHandles = map[string]*os.File{
 		"index.int": f,
 	}
 
-	return nil
+	return err
+}
+
+func (w *Writer) GetEvent(id int) (models.Event, error) {
+	indexPath := w.dataDir + "index.int"
+	indexFile, err := os.Open(indexPath)
+	if err != nil {
+		return models.Event{}, err
+	}
+
+	rows := []*Row{}
+	if err := gocsv.UnmarshalFile(indexFile, &rows); err != nil {
+		return models.Event{}, err
+	}
+
+	row := rows[id-1]
+
+	return models.Event{
+		ID:        row.Index,
+		Timestamp: row.Timestamp,
+	}, nil
 }
 
 func (w *Writer) SaveEvent(e models.Event) error {
-	index, err := w.getNextIndex()
-	if err != nil {
-		return err
-	}
+	w.m.Lock()
+	defer w.m.Unlock()
 
-	rowString := fmt.Sprintf("%d,%d\n", index, time.Now().Unix())
+	index := w.getNextIndex()
+
+	rowString := fmt.Sprintf("%d,%d\n", index, w.clock.Now().Unix())
 
 	indexFile := w.fileHandles["index.int"]
 
@@ -71,21 +97,7 @@ type Row struct {
 	Timestamp int `csv:"timestamp"`
 }
 
-func (w *Writer) getNextIndex() (int, error) {
-	w.m.Lock()
-	defer w.m.Unlock()
-
-	indexFile := w.fileHandles["index.int"]
-
-	rows := []*Row{}
-
-	if err := gocsv.UnmarshalFile(indexFile, &rows); err != nil {
-		if err == gocsv.ErrEmptyCSVFile {
-			return 0, nil
-		}
-		panic(err)
-	}
-
-	lastRow := rows[len(rows)-1]
-	return lastRow.Index + 1, nil
+func (w *Writer) getNextIndex() int {
+	w.currentIndex++
+	return w.currentIndex
 }

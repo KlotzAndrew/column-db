@@ -2,15 +2,21 @@ package columndb_test
 
 import (
 	"testing"
+	"time"
 
 	"columndb/models"
-	"columndb/reader"
 	"columndb/writer"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWriteAndRead(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(t, err)
+
 	event := models.Event{
 		Fields: map[string]any{
 			"status":        200,
@@ -18,16 +24,29 @@ func TestWriteAndRead(t *testing.T) {
 		},
 	}
 
-	w := writer.NewWriter("data/")
-	err := w.Setup()
+	err = w.SaveEvent(event)
 	assert.NoError(t, err)
+
+	clock.Advance(time.Second * 10)
 
 	err = w.SaveEvent(event)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, 1)
 
-	res, err := reader.GetEvent(1)
+	expected_1 := models.Event{
+		ID:        1,
+		Timestamp: 200,
+	}
+
+	res, err := w.GetEvent(expected_1.ID)
 	assert.NoError(t, err)
+	assert.Equal(t, expected_1, res)
 
-	assert.NotEqual(t, event, res)
+	expected_2 := models.Event{
+		ID:        2,
+		Timestamp: 210,
+	}
+
+	res, err = w.GetEvent(expected_2.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, expected_2, res)
 }
