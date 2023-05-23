@@ -20,7 +20,7 @@ func TestWriteAndRead(t *testing.T) {
 	event := models.Event{
 		Fields: map[string]any{
 			"status":        200,
-			"response_time": 200,
+			"response_time": 46.3,
 		},
 	}
 
