@@ -19,8 +19,8 @@ func TestWriteAndRead(t *testing.T) {
 
 	event := models.Event{
 		Fields: map[string]any{
-			"status":        200,
-			"response_time": 46.3,
+			"status":        float64(200),
+			"response_time": float64(46.3),
 		},
 	}
 
@@ -35,6 +35,7 @@ func TestWriteAndRead(t *testing.T) {
 	expected_1 := models.Event{
 		ID:        1,
 		Timestamp: 200,
+		Fields:    event.Fields,
 	}
 
 	res, err := w.GetEvent(expected_1.ID)
@@ -44,6 +45,7 @@ func TestWriteAndRead(t *testing.T) {
 	expected_2 := models.Event{
 		ID:        2,
 		Timestamp: 210,
+		Fields:    event.Fields,
 	}
 
 	res, err = w.GetEvent(expected_2.ID)

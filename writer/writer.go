@@ -2,7 +2,10 @@ package writer
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"columndb/models"
@@ -69,11 +72,37 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 	}
 
 	row := rows[id-1]
-
-	return models.Event{
+	event := models.Event{
 		ID:        row.Index,
 		Timestamp: row.Timestamp,
-	}, nil
+		Fields:    map[string]any{},
+	}
+
+	files, err := ioutil.ReadDir(w.dataDir)
+	if err != nil {
+		return models.Event{}, errors.Wrapf(err, "failed to read data directory %s", w.dataDir)
+	}
+	for _, file := range files {
+		if file.Name() == "index.int" || file.Name() == ".keep" {
+			continue
+		}
+		fmt.Println("=====", file.Name())
+		file, err := os.Open(w.dataDir + file.Name())
+		if err != nil {
+			return models.Event{}, errors.Wrapf(err, "failed to open file %s", file.Name())
+		}
+		rows := []*ValueRow{}
+		if err := gocsv.UnmarshalFile(file, &rows); err != nil {
+			return models.Event{}, errors.Wrapf(err, "failed to unmarshal file %s", file.Name())
+		}
+		row := rows[id-1]
+		fileName := filepath.Base(file.Name())
+		fieldName := strings.Split(fileName, ".")[0]
+		event.Fields[fieldName] = row.Value
+		fmt.Println("=== adding fielname and value", fieldName, row.Value)
+	}
+
+	return event, nil
 }
 
 func (w *Writer) SaveEvent(e models.Event) error {
@@ -136,6 +165,11 @@ func guessType(value any) string {
 type Row struct {
 	Index     int `csv:"index"`
 	Timestamp int `csv:"timestamp"`
+}
+
+type ValueRow struct {
+	Index int     `csv:"index"`
+	Value float64 `csv:"value"`
 }
 
 func (w *Writer) getNextIndex() int {
