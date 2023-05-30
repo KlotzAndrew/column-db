@@ -1,16 +1,18 @@
 package writer
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"columndb/models"
+	"columndb/utils"
 
-	"github.com/gocarina/gocsv"
 	"github.com/jonboulle/clockwork"
 	"github.com/pkg/errors"
 )
@@ -34,41 +36,72 @@ func NewWriter(dataDir string, clock clockwork.Clock) Writer {
 
 func (w *Writer) Setup() error {
 	indexPath := w.dataDir + "index.int"
-	f, err := os.OpenFile(indexPath, os.O_RDWR|os.O_CREATE, 0755)
+	file, err := os.OpenFile(indexPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to open index file %s", indexPath)
 	}
 
-	rows := []*Row{}
-	if err := gocsv.UnmarshalFile(f, &rows); err != nil {
-		if err == gocsv.ErrEmptyCSVFile {
-			if _, err := f.WriteString("index,timestamp\n"); err != nil {
-				return err
-			}
-		} else {
-			return err
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	currentIndex := 0
+	if filesize > 0 {
+		lastLine, err := getLastLine(file)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get last line from index file %s", indexPath)
 		}
+		currentIndex = lastLine.Index
 	}
 
-	w.currentIndex = len(rows)
-
+	w.currentIndex = currentIndex
 	w.fileHandles = map[string]*os.File{
-		"index.int": f,
+		"index.int": file,
 	}
 
 	return err
+}
+
+func getLastLine(file *os.File) (ValueRow, error) {
+	lastLine, err := utils.GetLastLine(file)
+	if err != nil {
+		return ValueRow{}, errors.Wrapf(err, "failed to get last line from file %s", file.Name())
+	}
+
+	vals := strings.SplitN(string(lastLine), ",", 2)
+	index, err := strconv.Atoi(vals[0])
+	if err != nil {
+		return ValueRow{}, errors.Wrapf(err, "failed to convert index %s to int", vals[0])
+	}
+	value, err := strconv.Atoi(vals[1])
+	if err != nil {
+		return ValueRow{}, errors.Wrapf(err, "failed to convert value %s to int", vals[1])
+	}
+	row := ValueRow{Index: index, Value: value}
+
+	return row, nil
 }
 
 func (w *Writer) GetEvent(id int) (models.Event, error) {
 	indexPath := w.dataDir + "index.int"
 	indexFile, err := os.Open(indexPath)
 	if err != nil {
-		return models.Event{}, err
+		return models.Event{}, errors.Wrapf(err, "failed to open index file %s", indexPath)
 	}
 
-	rows := []*Row{}
-	if err := gocsv.UnmarshalFile(indexFile, &rows); err != nil {
-		return models.Event{}, err
+	rows := []Row{}
+	scanner := bufio.NewScanner(indexFile)
+	for scanner.Scan() {
+		vals := strings.SplitN(scanner.Text(), ",", 2)
+		index, err := strconv.Atoi(vals[0])
+		if err != nil {
+			return models.Event{}, errors.Wrapf(err, "failed to convert index %s to int", vals[0])
+		}
+		timestamp, err := strconv.Atoi(vals[1])
+		if err != nil {
+			return models.Event{}, errors.Wrapf(err, "failed to convert timestamp %s to int", vals[1])
+		}
+		row := Row{Index: index, Timestamp: timestamp}
+		rows = append(rows, row)
 	}
 
 	row := rows[id-1]
@@ -86,20 +119,53 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 		if file.Name() == "index.int" || file.Name() == ".keep" {
 			continue
 		}
-		fmt.Println("=====", file.Name())
 		file, err := os.Open(w.dataDir + file.Name())
 		if err != nil {
 			return models.Event{}, errors.Wrapf(err, "failed to open file %s", file.Name())
 		}
-		rows := []*ValueRow{}
-		if err := gocsv.UnmarshalFile(file, &rows); err != nil {
-			return models.Event{}, errors.Wrapf(err, "failed to unmarshal file %s", file.Name())
+
+		valueRows := []ValueRow{}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			vals := strings.SplitN(scanner.Text(), ",", 2)
+			index, err := strconv.Atoi(vals[0])
+			if err != nil {
+				return models.Event{}, err
+			}
+
+			valueRow := ValueRow{Index: index, Value: vals[1]}
+			valueRows = append(valueRows, valueRow)
 		}
-		row := rows[id-1]
+
+		row := valueRows[id-1]
+
 		fileName := filepath.Base(file.Name())
 		fieldName := strings.Split(fileName, ".")[0]
+		fieldType := strings.Split(fileName, ".")[1]
+
+		switch fieldType {
+		case "int":
+			v, ok := row.Value.(int)
+			if !ok {
+				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to int", row.Value)
+			}
+			row.Value = v
+		case "float":
+			s, ok := row.Value.(string)
+			if !ok {
+				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to string", row.Value)
+			}
+
+			parsed, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to float", row.Value)
+			}
+			row.Value = parsed
+		case "string":
+			// do nothing
+		}
+
 		event.Fields[fieldName] = row.Value
-		fmt.Println("=== adding fielname and value", fieldName, row.Value)
 	}
 
 	return event, nil
@@ -124,13 +190,9 @@ func (w *Writer) SaveEvent(e models.Event) error {
 		_, err := os.Stat(filePath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
+				_, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
 				if err != nil {
 					return errors.Wrapf(err, "failed to open file %s", filePath)
-				}
-				headerRow := fmt.Sprintf("index,value\n")
-				if _, err := file.WriteString(headerRow); err != nil {
-					return errors.Wrapf(err, "failed to write header row to file %s", filePath)
 				}
 			}
 		}
@@ -162,14 +224,40 @@ func guessType(value any) string {
 	}
 }
 
+func convertToType(value any, valueType string) any {
+	switch valueType {
+	case "float":
+		return value.(float64)
+	case "int":
+		return value.(int)
+	case "string":
+		return value.(string)
+	default:
+		return value.(string)
+	}
+}
+
+func stringToType(value any) any {
+	switch value.(type) {
+	case float64:
+		return value.(float64)
+	case int:
+		return value.(int)
+	case string:
+		return value.(string)
+	default:
+		return value.(string)
+	}
+}
+
 type Row struct {
-	Index     int `csv:"index"`
-	Timestamp int `csv:"timestamp"`
+	Index     int
+	Timestamp int
 }
 
 type ValueRow struct {
-	Index int     `csv:"index"`
-	Value float64 `csv:"value"`
+	Index int
+	Value any
 }
 
 func (w *Writer) getNextIndex() int {
