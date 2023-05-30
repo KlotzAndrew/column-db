@@ -22,6 +22,7 @@ func TestWriteAndRead(t *testing.T) {
 			"status":        float64(200),
 			"response_time": float64(46.3),
 			"error":         "tea pot",
+			"success":       true,
 		},
 	}
 

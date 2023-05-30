@@ -147,13 +147,13 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 		case "int":
 			v, ok := row.Value.(int)
 			if !ok {
-				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to int", row.Value)
+				return models.Event{}, errors.Errorf("failed to convert value %s to int", row.Value)
 			}
 			row.Value = v
 		case "float":
 			s, ok := row.Value.(string)
 			if !ok {
-				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to string", row.Value)
+				return models.Event{}, errors.Errorf("failed to convert value %s to string", row.Value)
 			}
 
 			parsed, err := strconv.ParseFloat(s, 64)
@@ -162,7 +162,24 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 			}
 			row.Value = parsed
 		case "string":
-			// do nothing
+			v, ok := row.Value.(string)
+			if !ok {
+				return models.Event{}, errors.Errorf("failed to convert value %s to string", row.Value)
+			}
+			row.Value = v
+		case "bool":
+			v, ok := row.Value.(string)
+			if !ok {
+				return models.Event{}, errors.Errorf("failed to convert value %s to string", row.Value)
+			}
+			value, err := strconv.ParseBool(v)
+			if err != nil {
+				return models.Event{}, errors.Wrapf(err, "failed to convert value %s to bool", row.Value)
+			}
+
+			row.Value = value
+		default:
+			panic("unknown type")
 		}
 
 		event.Fields[fieldName] = row.Value
@@ -219,6 +236,8 @@ func guessType(value any) string {
 		return "int"
 	case string:
 		return "string"
+	case bool:
+		return "bool"
 	default:
 		return "string"
 	}
