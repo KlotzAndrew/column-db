@@ -81,8 +81,65 @@ func getLastLine(file *os.File) (ValueRow, error) {
 	return row, nil
 }
 
-func (w *Writer) Avg(field string) (int, error) {
-	return 0, nil
+func (w *Writer) Avg(fieldName string) (float64, error) {
+	files, err := ioutil.ReadDir(w.dataDir)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to read data directory %s", w.dataDir)
+	}
+
+	var sum float64
+	var count float64
+	for _, file := range files {
+		if file.Name() == "index.int" || file.Name() == ".keep" {
+			continue
+		}
+
+		// check if filename starts with fieldname
+		if !strings.HasPrefix(file.Name(), fieldName) {
+			continue
+		}
+
+		file, err := os.Open(w.dataDir + file.Name())
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to open file %s", file.Name())
+		}
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			_, suffix := filePrefixSuffix(file.Name())
+			if suffix == "int" {
+				vals := strings.SplitN(scanner.Text(), ",", 2)
+				value, err := strconv.Atoi(vals[1])
+				if err != nil {
+					return 0, errors.Wrapf(err, "failed to convert value %s to int", vals[1])
+				}
+				sum += float64(value)
+				count++
+			} else if suffix == "float" {
+				vals := strings.SplitN(scanner.Text(), ",", 2)
+				value, err := strconv.ParseFloat(vals[1], 64)
+				if err != nil {
+					return 0, errors.Wrapf(err, "failed to convert value %s to float", vals[1])
+				}
+				sum += value
+				count++
+			} else {
+				panic("unknown type")
+			}
+		}
+
+		break
+	}
+
+	res := float64(sum) / float64(count)
+
+	return res, nil
+}
+
+func filePrefixSuffix(fileName string) (string, string) {
+	fieldName := strings.Split(fileName, ".")[0]
+	fieldType := strings.Split(fileName, ".")[1]
+	return fieldName, fieldType
 }
 
 func (w *Writer) GetEvent(id int) (models.Event, error) {

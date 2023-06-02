@@ -116,5 +116,5 @@ func TestAvg(t *testing.T) {
 	avg, err := w.Avg("duration")
 	assert.NoError(t, err)
 
-	assert.Equal(t, 0, avg)
+	assert.Equal(t, float64(200), avg)
 }
