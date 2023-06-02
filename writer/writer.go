@@ -27,8 +27,8 @@ type Writer struct {
 	fileHandles  map[string]*os.File
 }
 
-func NewWriter(dataDir string, clock clockwork.Clock) Writer {
-	return Writer{
+func NewWriter(dataDir string, clock clockwork.Clock) *Writer {
+	return &Writer{
 		dataDir: dataDir,
 		clock:   clock,
 	}
@@ -81,6 +81,10 @@ func getLastLine(file *os.File) (ValueRow, error) {
 	return row, nil
 }
 
+func (w *Writer) Avg(field string) (int, error) {
+	return 0, nil
+}
+
 func (w *Writer) GetEvent(id int) (models.Event, error) {
 	indexPath := w.dataDir + "index.int"
 	indexFile, err := os.Open(indexPath)
@@ -124,20 +128,27 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 			return models.Event{}, errors.Wrapf(err, "failed to open file %s", file.Name())
 		}
 
-		valueRows := []ValueRow{}
+		row := ValueRow{}
+		found := false
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			vals := strings.SplitN(scanner.Text(), ",", 2)
-			index, err := strconv.Atoi(vals[0])
+			rowId, err := strconv.Atoi(vals[0])
 			if err != nil {
 				return models.Event{}, err
 			}
 
-			valueRow := ValueRow{Index: index, Value: vals[1]}
-			valueRows = append(valueRows, valueRow)
+			if rowId == id {
+				row = ValueRow{Index: rowId, Value: vals[1]}
+				found = true
+			} else if rowId > id {
+				break
+			}
 		}
 
-		row := valueRows[id-1]
+		if !found {
+			continue
+		}
 
 		fileName := filepath.Base(file.Name())
 		fieldName := strings.Split(fileName, ".")[0]

@@ -91,3 +91,30 @@ func TestContinuesIndex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected_1, res)
 }
+
+func saveEvents(t *testing.T, w *writer.Writer, events []models.Event) {
+	for _, event := range events {
+		err := w.SaveEvent(event)
+		assert.NoError(t, err)
+	}
+}
+
+func TestAvg(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(time.Unix(500, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(t, err)
+
+	saveEvents(t, w,
+		[]models.Event{
+			{Fields: map[string]any{"duration": float64(100)}},
+			{Fields: map[string]any{"duration": float64(200)}},
+			{Fields: map[string]any{"duration": float64(300)}},
+		},
+	)
+
+	avg, err := w.Avg("duration")
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, avg)
+}
