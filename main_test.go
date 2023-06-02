@@ -1,6 +1,8 @@
 package columndb_test
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -10,6 +12,14 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 )
+
+func makeTmpDir(t *testing.T) string {
+	dir, err := ioutil.TempDir("data", "test-data-")
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	return dir
+}
 
 func TestWriteAndRead(t *testing.T) {
 	clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
@@ -120,8 +130,11 @@ func TestAvg(t *testing.T) {
 }
 
 func TestWhere(t *testing.T) {
+	dir := makeTmpDir(t)
+	defer os.RemoveAll(dir)
+
 	clock := clockwork.NewFakeClockAt(time.Unix(500, 100))
-	w := writer.NewWriter("data/", clock)
+	w := writer.NewWriter(dir+"/", clock)
 	err := w.Setup()
 	assert.NoError(t, err)
 
