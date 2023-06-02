@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func GetLastLine(file *os.File) ([]byte, error) {
+func GetLastLineBytes(file *os.File) ([]byte, error) {
 	stat, _ := file.Stat()
 	filesize := stat.Size()
 
@@ -37,10 +37,7 @@ func GetLastLine(file *os.File) ([]byte, error) {
 			}
 		}
 
-		fmt.Println("=== reading ", buf[0], i, string(buf[0]), "--close--")
-
 		if buf[0] == '\n' {
-			fmt.Println("found end", buf[0] == '\n', i, filesize)
 			if !foundEnd {
 				foundEnd = true
 				end = currentIndex
@@ -55,7 +52,6 @@ func GetLastLine(file *os.File) ([]byte, error) {
 			break
 		}
 	}
-	fmt.Println("start", start, "end", end)
 	finalBuf := make([]byte, end-start)
 	_, err := file.ReadAt(finalBuf, start)
 	if err != nil {

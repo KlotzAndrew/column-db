@@ -14,7 +14,7 @@ func TestGetLastLine(t *testing.T) {
 	file, err := os.Open(testFile)
 	assert.NoError(t, err)
 
-	res, err := utils.GetLastLine(file)
+	res, err := utils.GetLastLineBytes(file)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "2,210", string(res))
@@ -26,7 +26,7 @@ func TestGetLastLineSingle(t *testing.T) {
 	file, err := os.Open(testFile)
 	assert.NoError(t, err)
 
-	res, err := utils.GetLastLine(file)
+	res, err := utils.GetLastLineBytes(file)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "7,123", string(res))

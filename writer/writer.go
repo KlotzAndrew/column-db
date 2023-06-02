@@ -10,11 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	"columndb/models"
-	"columndb/utils"
-
 	"github.com/jonboulle/clockwork"
 	"github.com/pkg/errors"
+
+	"columndb/models"
+	"columndb/utils"
 )
 
 type Writer struct {
@@ -62,7 +62,7 @@ func (w *Writer) Setup() error {
 }
 
 func getLastLine(file *os.File) (ValueRow, error) {
-	lastLine, err := utils.GetLastLine(file)
+	lastLine, err := utils.GetLastLineBytes(file)
 	if err != nil {
 		return ValueRow{}, errors.Wrapf(err, "failed to get last line from file %s", file.Name())
 	}
