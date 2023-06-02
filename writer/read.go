@@ -13,6 +13,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	Equal            = "="
+	LessThan         = "<"
+	GreaterThanEqual = ">="
+	GreaterThan      = ">"
+	LessThanEqual    = "<="
+)
+
+type Query struct {
+	Filters map[string][]string
+}
+
 func (w *Writer) Avg(fieldName string) (float64, error) {
 	files, err := ioutil.ReadDir(w.dataDir)
 	if err != nil {
