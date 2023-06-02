@@ -21,6 +21,8 @@ const (
 	LessThanEqual    = "<="
 )
 
+const IndexFile = "index.int"
+
 type Query struct {
 	Filters map[string][]string
 }
@@ -34,7 +36,7 @@ func (w *Writer) Avg(fieldName string) (float64, error) {
 	var sum float64
 	var count float64
 	for _, file := range files {
-		if file.Name() == "index.int" || file.Name() == ".keep" {
+		if file.Name() == IndexFile || file.Name() == ".keep" {
 			continue
 		}
 
@@ -87,7 +89,7 @@ func filePrefixSuffix(fileName string) (string, string) {
 }
 
 func (w *Writer) GetEvent(id int) (models.Event, error) {
-	indexPath := w.dataDir + "index.int"
+	indexPath := w.dataDir + IndexFile
 	indexFile, err := os.Open(indexPath)
 	if err != nil {
 		return models.Event{}, errors.Wrapf(err, "failed to open index file %s", indexPath)
@@ -121,7 +123,7 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 		return models.Event{}, errors.Wrapf(err, "failed to read data directory %s", w.dataDir)
 	}
 	for _, file := range files {
-		if file.Name() == "index.int" || file.Name() == ".keep" {
+		if file.Name() == IndexFile || file.Name() == ".keep" {
 			continue
 		}
 		file, err := os.Open(w.dataDir + file.Name())

@@ -18,7 +18,7 @@ func (w *Writer) getNextIndex() int {
 }
 
 func (w *Writer) Setup() error {
-	indexPath := w.dataDir + "index.int"
+	indexPath := w.dataDir + IndexFile
 	file, err := os.OpenFile(indexPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open index file %s", indexPath)
@@ -38,7 +38,7 @@ func (w *Writer) Setup() error {
 
 	w.currentIndex = currentIndex
 	w.fileHandles = map[string]*os.File{
-		"index.int": file,
+		IndexFile: file,
 	}
 
 	return err
@@ -71,7 +71,7 @@ func (w *Writer) SaveEvent(e models.Event) error {
 	index := w.getNextIndex()
 
 	indexString := fmt.Sprintf("%d,%d\n", index, w.clock.Now().Unix())
-	indexFile := w.fileHandles["index.int"]
+	indexFile := w.fileHandles[IndexFile]
 	if _, err := indexFile.WriteString(indexString); err != nil {
 		return errors.Wrapf(err, "failed to write index to file %s", indexFile.Name())
 	}
