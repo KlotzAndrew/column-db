@@ -118,3 +118,23 @@ func TestAvg(t *testing.T) {
 
 	assert.Equal(t, float64(200), avg)
 }
+
+func TestWhere(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(time.Unix(500, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(t, err)
+
+	saveEvents(t, w,
+		[]models.Event{
+			{Fields: map[string]any{"duration": float64(100)}},
+			{Fields: map[string]any{"duration": float64(200)}},
+			{Fields: map[string]any{"duration": float64(300)}},
+		},
+	)
+
+	events, err := w.Where()
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(events))
+}

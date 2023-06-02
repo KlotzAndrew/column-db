@@ -199,3 +199,7 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 
 	return event, nil
 }
+
+func (w *Writer) Where() ([]models.Event, error) {
+	return []models.Event{}, nil
+}
