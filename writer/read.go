@@ -49,6 +49,7 @@ func (w *Writer) Avg(fieldName string) (float64, error) {
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to open file %s", file.Name())
 		}
+		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
@@ -94,6 +95,7 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 	if err != nil {
 		return models.Event{}, errors.Wrapf(err, "failed to open index file %s", indexPath)
 	}
+	defer indexFile.Close()
 
 	rows := []Row{}
 	scanner := bufio.NewScanner(indexFile)
@@ -130,6 +132,7 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 		if err != nil {
 			return models.Event{}, errors.Wrapf(err, "failed to open file %s", file.Name())
 		}
+		defer file.Close()
 
 		row := ValueRow{}
 		found := false

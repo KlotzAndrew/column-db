@@ -65,6 +65,59 @@ func TestWriteAndRead(t *testing.T) {
 	assert.Equal(t, expected_2, res)
 }
 
+// 15k rows: 501, 2436145 ns/o
+func BenchmarkReadWrite(b *testing.B) {
+	clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(b, err)
+
+	event := models.Event{
+		Fields: map[string]any{
+			"status":        float64(200),
+			"response_time": float64(46.3),
+			"error":         "tea pot",
+			"success":       true,
+		},
+	}
+
+	for n := 0; n < b.N; n++ {
+		err = w.SaveEvent(event)
+		assert.NoError(b, err)
+
+		clock.Advance(time.Second * 10)
+
+		_, err := w.GetEvent(n + 1)
+		assert.NoError(b, err)
+	}
+}
+
+func BenchmarkReadWriteWithStartup(b *testing.B) {
+	event := models.Event{
+		Fields: map[string]any{
+			"status":        float64(200),
+			"response_time": float64(46.3),
+			"error":         "tea pot",
+			"success":       true,
+		},
+	}
+
+	for n := 0; n < b.N; n++ {
+		clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
+		w := writer.NewWriter("data/", clock)
+		err := w.Setup()
+		assert.NoError(b, err)
+
+		err = w.SaveEvent(event)
+		assert.NoError(b, err)
+
+		clock.Advance(time.Second * 10)
+
+		_, err = w.GetEvent(n + 1)
+		assert.NoError(b, err)
+	}
+}
+
 func TestContinuesIndex(t *testing.T) {
 	clock := clockwork.NewFakeClockAt(time.Unix(500, 100))
 	w := writer.NewWriter("data-continues/", clock)

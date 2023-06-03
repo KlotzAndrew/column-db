@@ -94,6 +94,7 @@ func (w *Writer) SaveEvent(e models.Event) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to open file %s", filePath)
 		}
+		defer file.Close()
 
 		rowString := fmt.Sprintf("%d,%v\n", index, fieldValue)
 		if _, err := file.WriteString(rowString); err != nil {

@@ -41,10 +41,8 @@ func GetLastLineBytes(file *os.File) ([]byte, error) {
 			if !foundEnd {
 				foundEnd = true
 				end = currentIndex
-				fmt.Println("end is ", string(buf[0]), end, filesize, i)
 			} else {
 				start = currentIndex + 1
-				fmt.Println("start is ", string(buf[0]), start, filesize, i)
 				break
 			}
 		} else if filesize == i {
