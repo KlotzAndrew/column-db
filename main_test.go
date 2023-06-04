@@ -92,6 +92,51 @@ func BenchmarkReadWrite(b *testing.B) {
 	}
 }
 
+func BenchmarkWrite(b *testing.B) {
+	clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(b, err)
+
+	event := models.Event{
+		Fields: map[string]any{
+			"status":        float64(200),
+			"response_time": float64(46.3),
+			"error":         "tea pot",
+			"success":       true,
+		},
+	}
+
+	for n := 0; n < b.N; n++ {
+		err = w.SaveEvent(event)
+		assert.NoError(b, err)
+	}
+}
+
+func BenchmarkRead(b *testing.B) {
+	clock := clockwork.NewFakeClockAt(time.Unix(200, 100))
+	w := writer.NewWriter("data/", clock)
+	err := w.Setup()
+	assert.NoError(b, err)
+
+	event := models.Event{
+		Fields: map[string]any{
+			"status":        float64(200),
+			"response_time": float64(46.3),
+			"error":         "tea pot",
+			"success":       true,
+		},
+	}
+
+	err = w.SaveEvent(event)
+	assert.NoError(b, err)
+
+	for n := 0; n < b.N; n++ {
+		_, err = w.GetEvent(1)
+		assert.NoError(b, err)
+	}
+}
+
 func BenchmarkReadWriteWithStartup(b *testing.B) {
 	event := models.Event{
 		Fields: map[string]any{
