@@ -3,6 +3,7 @@ package columndb_test
 import (
 	"io/ioutil"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -236,16 +237,39 @@ func TestWhere(t *testing.T) {
 	err := w.Setup()
 	assert.NoError(t, err)
 
-	saveEvents(t, w,
-		[]models.Event{
-			{Fields: map[string]any{"duration": float64(100)}},
-			{Fields: map[string]any{"duration": float64(200)}},
-			{Fields: map[string]any{"duration": float64(300)}},
-		},
-	)
+	err = w.SaveEvent(models.Event{Fields: map[string]any{"duration": float64(100)}})
+	assert.NoError(t, err)
+	clock.Advance(time.Second * 10)
 
-	events, err := w.Where()
+	err = w.SaveEvent(models.Event{Fields: map[string]any{"duration": float64(200)}})
+	assert.NoError(t, err)
+	clock.Advance(time.Second * 10)
+
+	err = w.SaveEvent(models.Event{Fields: map[string]any{"duration": float64(300)}})
+	assert.NoError(t, err)
+	clock.Advance(time.Second * 10)
+
+	err = w.SaveEvent(models.Event{Fields: map[string]any{"duration": float64(400)}})
+	assert.NoError(t, err)
+	clock.Advance(time.Second * 10)
+
+	query1 := writer.Query{
+		Filters: map[string][]string{},
+	}
+
+	events, err := w.Where(query1)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(events))
+
+	query2 := writer.Query{
+		Filters: map[string][]string{
+			"timestamp": {writer.GreaterThan, strconv.Itoa(int(time.Unix(510, 100).UTC().Unix()))},
+		},
+	}
+
+	events, err = w.Where(query2)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, len(events))
 }

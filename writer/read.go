@@ -205,6 +205,62 @@ func (w *Writer) GetEvent(id int) (models.Event, error) {
 	return event, nil
 }
 
-func (w *Writer) Where() ([]models.Event, error) {
-	return []models.Event{}, nil
+func (w *Writer) Where(query Query) ([]models.Event, error) {
+	if len(query.Filters) == 0 {
+		return []models.Event{}, nil
+	}
+
+	timestampFilter, ok := query.Filters["timestamp"]
+	if !ok {
+		return []models.Event{}, nil
+	}
+
+	indexPath := w.dataDir + IndexFile
+	indexFile, err := os.Open(indexPath)
+	if err != nil {
+		return []models.Event{}, errors.Wrapf(err, "failed to open index file %s", indexPath)
+	}
+	defer indexFile.Close()
+
+	rows := []Row{}
+	scanner := bufio.NewScanner(indexFile)
+	for scanner.Scan() {
+		vals := strings.SplitN(scanner.Text(), ",", 2)
+		index, err := strconv.Atoi(vals[0])
+		if err != nil {
+			return []models.Event{}, errors.Wrapf(err, "failed to convert index %s to int", vals[0])
+		}
+		timestamp, err := strconv.Atoi(vals[1])
+		if err != nil {
+			return []models.Event{}, errors.Wrapf(err, "failed to convert timestamp %s to int", vals[1])
+		}
+
+		row := Row{Index: index, Timestamp: timestamp}
+
+		timestampFilterValue := timestampFilter[1]
+		timestampFilterValueInt, err := strconv.Atoi(timestampFilterValue)
+		if err != nil {
+			return []models.Event{}, errors.Wrapf(err, "failed to convert timestamp filter value %s to int", timestampFilterValue)
+		}
+
+		filterModifier := timestampFilter[0]
+		if filterModifier == GreaterThan {
+			if timestamp > timestampFilterValueInt {
+				rows = append(rows, row)
+			}
+		}
+
+	}
+
+	events := []models.Event{}
+	for _, row := range rows {
+		event := models.Event{
+			ID:        row.Index,
+			Timestamp: row.Timestamp,
+			Fields:    map[string]any{},
+		}
+		events = append(events, event)
+	}
+
+	return events, nil
 }
